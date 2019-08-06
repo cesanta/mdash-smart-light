@@ -1,0 +1,4 @@
+html,body { height: 100%; }
+select,input,label::before,textarea,.button,.btn:focus,.btn:active:focus,.btn.active:focus,.btn.focus,.btn:active.focus,.btn.active.focus {
+  outline: none; box-shadow: none !important;
+}

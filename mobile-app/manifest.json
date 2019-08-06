@@ -1,0 +1,13 @@
+{
+  "short_name": "mDash Smart Light",
+  "name": "mDash Smart Light full IoT product reference",
+  "lang": "en-US",
+  "start_url": "/",
+  "theme_color": "#fff",
+  "background_color": "#fff",
+  "display": "standalone",
+  "icons": [
+    { "src": "logo.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "logo-192x192.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}

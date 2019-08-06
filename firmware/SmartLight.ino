@@ -3,22 +3,29 @@
 #define MDASH_APP_NAME "SmartLight"
 #include <mDash.h>
 
-static int ledStatus = 0;  // Initially, LED is off. Mapped to shadow key `led`.
-static int ledPin = 5;     // Default LED pin. Mapped to shadow key `pin`.
+static int ledOn = 0;      // LED status. Mapped to `reported.app.on`
+static int ledPin = 5;     // LED pin
+static char *name = NULL;  // Device name
 
 static void reportShadowState() {
   mDashShadowUpdate(
-      "{\"state\":{\"reported\":{\"led\":%B,\"pin\":%d,\"ram\":%lu}}}",
-      ledStatus, ledPin, mDashGetFreeRam());
+      "{\"state\":{\"reported\":"
+      "{\"app\":{\"on\":%B,\"pin\":%d,\"name\":%Q}}}}",
+      ledOn, ledPin, name == NULL ? "My Light" : name);
 }
 
 static void onShadowDelta(const char *topic, const char *message) {
+  char buf[50];
   double dv;
   printf("Topic: %s, message: %s\n", topic, message);
-  if (mDashGetNum(message, "$.state.pin", &dv)) ledPin = dv;
-  mDashGetBool(message, "$.state.led", &ledStatus);
+  if (mDashGetNum(message, "$.state.app.pin", &dv)) ledPin = dv;
+  if (mDashGetStr(message, "$.state.app.name", buf, sizeof(buf)) > 0) {
+    free(name);
+    name = strdup(buf);
+  }
+  mDashGetBool(message, "$.state.app.on", &ledOn);
   pinMode(ledPin, OUTPUT);          // Synchronise
-  digitalWrite(ledPin, ledStatus);  // the hardware
+  digitalWrite(ledPin, ledOn);      // the hardware
   reportShadowState();              // And report, clearing the delta
 }
 
@@ -38,5 +45,4 @@ void loop() {
   delay(5 * 1000);  // Report every 5 seconds
   String topic = String("db/") + mDashGetDeviceID() + "/ram";  // Save free RAM
   mDashPublish(topic.c_str(), "%lu", mDashGetFreeRam());       // to the DB
-  reportShadowState();  // Report current shadow state
 }
