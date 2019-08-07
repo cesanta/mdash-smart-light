@@ -122,14 +122,10 @@ var Device = function(props) {
 };
 
 var Page1 = function(props) {
-  var arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6, 7];
-  var divs = arr.map(function(v) {
-    return h('div', {}, v);
-  });
   var content =
       h('div', {class: 'h-100 d-flex align-items-center'},
-        h('div', {class: 'text-center w-100 text-muted'},
-          h('i', {class: 'fa fa-frown-o fa-2x'}), h('br'), 'No devices yet'));
+        h('div', {class: 'text-center w-100 text-muted font-weight-light'},
+          h('i', {class: 'fa fa-bell-o fa-2x'}), h('br'), 'No devices yet'));
   if (props.app.state.keys && props.app.state.keys.length) {
     content =
         h('div', {class: 'h-100'},  // JSON.stringify(props.app.state),
@@ -287,6 +283,6 @@ window.onload = function() {
   preact.render(h(App), document.body);
 
   if ('serviceWorker' in navigator)  // for PWA
-    navigator.serviceWorker.register('service-worker.js')
+    navigator.serviceWorker.register('js/service-worker.js')
         .catch(function(err) {});
 };
