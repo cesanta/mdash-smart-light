@@ -1,5 +1,5 @@
 var h = preact.h;
-var deviceURL = 'http://192.168.4.1';
+var provisionURL = 'https://provision.mdash.net';
 var mdashURL = 'https://mdash.net';
 
 var Header = function(props) {
@@ -152,7 +152,7 @@ var Page2 = function(props) {
           title: 'Scan',
           icon: 'fa-search',
           onClick: function() {
-            return axios({url: deviceURL + '/GetKey', timeout: 2000})
+            return axios({url: provisionURL + '/GetKey', timeout: 7000})
                 .then(function(res) {
                   var key = res.data.result;
                   if (key) {
@@ -206,8 +206,8 @@ var Page2 = function(props) {
           var data = JSON.stringify({ssid: state.ssid, pass: state.pass});
           return axios({
                    method: 'POST',
-                   url: deviceURL + '/setup',
-                   timeout: 2000,
+                   url: provisionURL + '/setup',
+                   timeout: 7000,
                    data: data,
                  })
               .then(function(res) {
@@ -270,7 +270,7 @@ var App = function(props) {
   var p = {app: self};
   return h(
       'div', {
-        class: 'main border-left border-right',
+        class: 'main border',
         style: 'max-width: 480px; margin: 0 auto; ' +
             'min-height: 100%; max-height: 100%;' +
             'display:grid;grid-template-rows: auto 1fr auto;' +
