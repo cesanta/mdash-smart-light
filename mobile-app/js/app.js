@@ -1,6 +1,10 @@
 var h = preact.h;
-var provisionURL = 'https://provision.mdash.net';
-var mdashURL = 'https://mdash.net';
+
+var settings = {
+  provisionURL: 'https://provision.mdash.net',
+  mdashURL: 'https://mdash.net',
+  callTimeoutMilli: 10000,  // 10 seconds
+};
 
 var Header = function(props) {
   return h(
@@ -74,7 +78,8 @@ var SpinButton = function(props) {
 var Device = function(props) {
   var self = this, state = self.state;
   var refresh = function() {
-    var url = mdashURL + '/api/v2/m/device?access_token=' + props.accesskey;
+    var url =
+        settings.mdashURL + '/api/v2/m/device?access_token=' + props.accesskey;
     return axios.get(url).then(function(res) {
       self.setState({device: res.data});
     });
@@ -113,8 +118,8 @@ var Device = function(props) {
             onChange: function(ev) {
               var body = {shadow: {state: {desired: {app: {}}}}};
               body.shadow.state.desired.app.on = ev.target.checked;
-              var url =
-                  mdashURL + '/api/v2/m/device?access_token=' + props.accesskey;
+              var url = settings.mdashURL +
+                  '/api/v2/m/device?access_token=' + props.accesskey;
               axios.post(url, body).catch(errorHandler);
             },
           }),
@@ -152,7 +157,10 @@ var Page2 = function(props) {
           title: 'Scan',
           icon: 'fa-search',
           onClick: function() {
-            return axios({url: provisionURL + '/GetKey', timeout: 7000})
+            return axios({
+                     url: settings.provisionURL + '/GetKey',
+                     timeout: settings.callTimeoutMilli,
+                   })
                 .then(function(res) {
                   var key = res.data.result;
                   if (key) {
@@ -206,8 +214,8 @@ var Page2 = function(props) {
           var data = JSON.stringify({ssid: state.ssid, pass: state.pass});
           return axios({
                    method: 'POST',
-                   url: provisionURL + '/setup',
-                   timeout: 7000,
+                   url: settings.provisionURL + '/setup',
+                   timeout: settings.callTimeoutMilli,
                    data: data,
                  })
               .then(function(res) {
