@@ -146,6 +146,9 @@ var Page2 = function(props) {
   self.componentDidMount = function() {
     self.setState({step: 0, ssid: '', pass: ''});
   };
+  self.componentWillUnmount = function() {
+    self.unmounted = true;
+  };
   var alertClass = 'p-2 small text-muted font-weight-light';
   var Step0 =
       h('div', {},
@@ -157,11 +160,14 @@ var Page2 = function(props) {
           title: 'Scan',
           icon: 'fa-search',
           onClick: function() {
-            return axios({
-                     url: settings.provisionURL + '/GetKey',
-                     timeout: settings.callTimeoutMilli,
-                   })
-                .then(function(res) {
+            return new Promise(function(resolve, reject) {
+              var attempts = 0;
+              var f = function() {
+                var error = function(err) {
+                  console.log('Error: ', err);
+                  if (!self.unmounted) setTimeout(f, 500);
+                };
+                var success = function(res) {
                   var key = res.data.result;
                   if (key) {
                     for (;;) {
@@ -173,10 +179,20 @@ var Page2 = function(props) {
                     props.app.setState(props.app.state);
                     setStateToLocalStorage(props.app.state);
                     self.setState({step: 1});
+                    resolve();
                   } else {
-                    alert('Error: ' + res.data.error);
+                    reject(res.data.error);
                   }
-                });
+                };
+                axios({
+                  url: settings.provisionURL + '/GetKey',
+                  timeout: settings.callTimeoutMilli,
+                }).then(success, error);
+                attempts++;
+                console.log('attempt', attempts);
+              };
+              f();
+            });
           },
         }));
   var Step1 = h(
