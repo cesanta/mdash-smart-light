@@ -3,46 +3,52 @@
 #define MDASH_APP_NAME "SmartLight"
 #include <mDash.h>
 
-static int ledOn = 0;      // LED status. Mapped to `reported.app.on`
-static int ledPin = 5;     // LED pin
+static int ledStatus = 0;  // Initially, LED is off. Mapped to shadow key `led`.
+static int ledPin = 5;     // Default LED pin. Mapped to shadow key `pin`.
 static char *name = NULL;  // Device name
 
 static void reportShadowState() {
   mDashShadowUpdate(
       "{\"state\":{\"reported\":"
-      "{\"app\":{\"on\":%B,\"pin\":%d,\"name\":%Q}}}}",
-      ledOn, ledPin, name == NULL ? "My Light" : name);
+      "{\"led\":%B,\"pin\":%d,\"name\":%Q}}}",
+      ledStatus, ledPin, name == NULL ? "My Light" : name);
 }
 
-static void onShadowDelta(const char *topic, const char *message) {
+// Called by the mDash when shadow delta is generated
+static void onShadowDelta(void *ctx, void *userdata) {
   char buf[50];
+  const char *params = mDashGetParams(ctx);
   double dv;
-  printf("Topic: %s, message: %s\n", topic, message);
-  if (mDashGetNum(message, "$.state.app.pin", &dv)) ledPin = dv;
-  if (mDashGetStr(message, "$.state.app.name", buf, sizeof(buf)) > 0) {
+  if (mDashGetNum(params, "$.state.pin", &dv)) ledPin = dv;
+  mDashGetBool(params, "$.state.led", &ledStatus);
+  if (mDashGetStr(params, "$.state.app.name", buf, sizeof(buf)) > 0) {
     free(name);
     name = strdup(buf);
   }
-  mDashGetBool(message, "$.state.app.on", &ledOn);
   pinMode(ledPin, OUTPUT);          // Synchronise
-  digitalWrite(ledPin, ledOn);      // the hardware
+  digitalWrite(ledPin, ledStatus);  // the hardware
   reportShadowState();              // And report, clearing the delta
+}
+
+// When we're reconnected, report our current state to shadow
+static void onConnStateChange(void *event_data, void *user_data) {
+  long connection_state = (long) event_data;
+  if (connection_state == MDASH_CONNECTED) reportShadowState();
 }
 
 void setup() {
   Serial.begin(115200);
   mDashBegin();
-  mDashShadowDeltaSubscribe(onShadowDelta);  // Handle delta
+  mDashExport("Shadow.Delta", onShadowDelta, NULL);
+  mDashRegisterEventHandler(MDASH_EVENT_CONN_STATE, onConnStateChange, NULL);
 
   // Until connected to the cloud, enable provisioning over serial
   while (mDashGetState() != MDASH_CONNECTED)
     if (Serial.available() > 0) mDashCLI(Serial.read());
-
-  reportShadowState();  // When connected, report current shadow state
 }
 
 void loop() {
-  delay(5 * 1000);  // Report every 5 seconds
-  String topic = String("db/") + mDashGetDeviceID() + "/ram";  // Save free RAM
-  mDashPublish(topic.c_str(), "%lu", mDashGetFreeRam());       // to the DB
+  delay(5 * 1000);
+  mDashShadowUpdate("{\"state\":{\"reported\":{\"ram_free\":%lu}}}",
+                    mDashGetFreeRam());  // Report free RAM periodically
 }
