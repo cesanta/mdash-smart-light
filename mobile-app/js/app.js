@@ -2,9 +2,8 @@ var h = preact.h;
 
 var Settings = {
   provisionURL: 'http://192.168.4.1',
-  mdashURL: 'http://192.168.1.86:8001',
-  protocol: 'http:',
-  // mdashURL: 'https://mdash.net',
+  protocol: 'https:',
+  mdashURL: 'https://mdash.net',
   callTimeoutMilli: 10000,  // 10 seconds
 };
 
