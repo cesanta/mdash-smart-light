@@ -166,9 +166,6 @@ var PageAddDevice = function(props) {
   self.componentDidMount = function() {
     props.app.setState({title: 'Add Device'});
     self.setState({step: 0, ssid: '', pass: '', public_key: ''});
-    if (location.search) {
-      self.setState({token: location.search.substring(1)});
-    }
   };
 
   self.componentWillUnmount = function() {
@@ -283,7 +280,7 @@ var PageAddDevice = function(props) {
           icon: 'fa-plus-circle',
           onClick: function() {
             var url = Settings.mdashURL +
-                '/customer?access_token=' + self.state.token;
+                '/customer?access_token=' + props.app.state.customer.token;
             return axios.get(url)
                 .then(function(res) {
                   var data = res.data;
@@ -334,14 +331,14 @@ var App = function(props) {
     // This app does not provide a way to share this customer, so it is not
     // possible to "login" from another phone or laptop and see same devices.
     // For that, use authenticated customers.
-    var access_token = localStorage.sltok;
+    var access_token = location.search.substring(1) || localStorage.sltok;
+    if (access_token === 'undefined') access_token = undefined;
     if (access_token) {
       self.loadCustomer(access_token);
     } else {
       // Register new customer
       axios.get(Settings.mdashURL + '/newcustomer')
           .then(function(res) {
-            localStorage.sltok = res.data.token;  // Store locally
             return self.loadCustomer(res.data.token);
           })
           .catch(errorHandler);
@@ -353,10 +350,14 @@ var App = function(props) {
     return axios.get(url)
         .then(function(res) {
           self.setState({customer: res.data});
-          // console.log('-', res.data);
+          localStorage.sltok = res.data.token;
+          if (location.search.length > 0)
+            location.href = location.protocol + '//' + location.host +
+                location.pathname + location.hash;
         })
         .catch(errorHandler);
   };
+
 
   self.render = function(props, state) {
     var p = {app: self};
