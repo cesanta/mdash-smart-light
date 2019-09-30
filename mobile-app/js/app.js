@@ -131,7 +131,7 @@ var Device = function(props) {
               checked: checked,
               onChange: function(ev) {
                 var body = {shadow: {state: {desired: {}}}};
-                body.shadow.state.desired.led = ev.target.checked;
+                body.shadow.state.desired.on = ev.target.checked;
                 axios.post(url, body).catch(errorHandler);
               },
             }),

@@ -1,0 +1,5 @@
+idf_component_register(SRCS main.c)
+#target_link_libraries(${COMPONENT_TARGET} "../mDash/src/esp32/libmDash.a")
+#add_library(mDash STATIC IMPORTED)
+#set_property(TARGET mDash PROPERTY IMPORTED_LOCATION ../mDash/src/esp32/libmDash.a)
+#target_link_libraries(${COMPONENT_LIB} PUBLIC mDash)
