@@ -1,6 +1,4 @@
 cmake_minimum_required(VERSION 3.5)
-#set(COMPONENTS booo)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(mdash-smart-light)
 target_link_libraries(${project_elf} "-L. ../mDash/src/esp32/libmDash.a")
-#target_link_libraries(${COMPONENT_TARGET} "-L../mDash/src/esp32 -lmDash")

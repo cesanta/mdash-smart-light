@@ -116,7 +116,7 @@ static void pause_then_reboot(int sleep_seconds) {
 }
 
 void app_main() {
-  static struct device_state state = {.on = false, .name = NULL};
+  struct device_state state = {.on = false, .name = NULL};
   mDashBeginWithWifi(init_wifi, NULL, NULL, NULL);
   mDashExport("Shadow.Delta", onShadowDelta, &state);
   mDashRegisterEventHandler(MDASH_EVENT_CONN_STATE, onConnStateChange, &state);
