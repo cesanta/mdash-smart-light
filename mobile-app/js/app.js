@@ -1,13 +1,14 @@
 var h = preact.h;
+var App = {};
 
-var Settings = {
+App.settings = {
   provisionURL: 'http://192.168.4.1',
-  protocol: 'https:',
   mdashURL: 'https://mdash.net',
+  appKey: '',               // mDash -> Keys -> Add new
   callTimeoutMilli: 10000,  // 10 seconds
 };
 
-var Header = function(props) {
+App.Header = function(props) {
   return h(
       'div', {class: 'p-2 border-bottom bg-light'},
       h('b', {}, props.app.state.title),
@@ -17,10 +18,10 @@ var Header = function(props) {
         h('img', {height: 24, src: 'images/logo-512x512.png'})));
 };
 
-var Footer = function(props) {
+App.Footer = function(props) {
   var self = this, app = props.app;
 
-  var mkTabButton = function(title, icon, tab, href) {
+  self.mkTabButton = function(title, icon, tab, href) {
     var active = (location.href == href);
     return h(
         'a', {
@@ -34,21 +35,24 @@ var Footer = function(props) {
           h('i', {class: 'mr-0 fa-fw fa ' + icon, style: 'width: 2em;'}),
           h('div', {class: 'small'}, title)));
   };
-  var baseurl = location.host + location.pathname;
-  return h(
-      'footer', {
-        class: 'd-flex align-items-stretch border-top',
-        style: 'flex-shrink: 0;'
-      },
-      mkTabButton(
-          'My Devices', 'fa-server', PageDevices,
-          Settings.protocol + '//' + baseurl + '#/'),
-      mkTabButton(
-          'Add Device', 'fa-plus-circle', PageAddDevice,
-          'http://' + baseurl + '?' + app.state.customer.token + '#/add1'));
+
+  self.render = function(props, state) {
+    var baseurl = location.host + location.pathname;
+    return h(
+        'footer', {
+          class: 'd-flex align-items-stretch border-top',
+          style: 'flex-shrink: 0;'
+        },
+        self.mkTabButton(
+            'My Devices', 'fa-server', PageDevices,
+            App.settings.protocol + '//' + baseurl + '#/'),
+        self.mkTabButton(
+            'Add Device', 'fa-plus-circle', PageAddDevice,
+            'http://' + baseurl + '?' + app.state.customer.token + '#/add1'));
+  };
 };
 
-var errorHandler = function(e) {
+App.errorHandler = function(e) {
   var msg = (((e.response || {}).data || {}).e || {}).message || e.message || e;
   alert(msg);
 };
@@ -67,7 +71,7 @@ var SpinButton = function(props) {
         onClick: function() {
           if (!props.onClick) return;
           self.setState({spin: true});
-          props.onClick().catch(errorHandler).then(function() {
+          props.onClick().catch(App.errorHandler).then(function() {
             self.setState({spin: false});
           });
         }
@@ -82,7 +86,7 @@ var SpinButton = function(props) {
 
 var Device = function(props) {
   var self = this;
-  var url = Settings.mdashURL + '/api/v2/m/device?access_token=' + props.k;
+  var url = App.settings.mdashURL + '/api/v2/m/device?access_token=' + props.k;
 
   self.componentDidMount = function() {
     self.setState({device: null});
@@ -132,7 +136,7 @@ var Device = function(props) {
               onChange: function(ev) {
                 var body = {shadow: {state: {desired: {}}}};
                 body.shadow.state.desired.on = ev.target.checked;
-                axios.post(url, body).catch(errorHandler);
+                axios.post(url, body).catch(App.errorHandler);
               },
             }),
             h('label', {'for': cbid}, h('span')))));
@@ -201,8 +205,8 @@ var PageAddDevice = function(props) {
                   }
                 };
                 axios({
-                  url: Settings.provisionURL + '/GetKey',
-                  timeout: Settings.callTimeoutMilli,
+                  url : App.settings.provisionURL + '/GetKey',
+                  timeout : App.settings.callTimeoutMilli,
                 }).then(success, error);
                 attempts++;
                 console.log('attempt', attempts);
@@ -246,10 +250,10 @@ var PageAddDevice = function(props) {
           var data =
               JSON.stringify({ssid: self.state.ssid, pass: self.state.pass});
           return axios({
-                   method: 'POST',
-                   url: Settings.provisionURL + '/setup',
-                   timeout: Settings.callTimeoutMilli,
-                   data: data,
+                   method : 'POST',
+                   url : App.settings.provisionURL + '/setup',
+                   timeout : App.settings.callTimeoutMilli,
+                   data : data,
                  })
               .then(function(res) {
                 if (res.data.result) {
@@ -263,24 +267,22 @@ var PageAddDevice = function(props) {
   var Step2 =
       h('div', {},
         h('a', {
-          href: location.href,
-          class: 'link text-decoration-none',
-          onClick: function() {
-            self.setState({step: 1});
-          }
+          href : location.href,
+          class : 'link text-decoration-none',
+          onClick : function() { self.setState({step : 1}); }
         },
           '\u2190', ' back'),
-        h('div', {class: alertClass + ' mt-2'}, 'WiFi configuretion applied. ',
+        h('div', {class : alertClass + ' mt-2'}, 'WiFi configuretion applied. ',
           'Go to your phone settings,', h('br'),
           'Join back to your WiFi network,', h('br'),
           'Return to this screen and press on Register device.'),
         h(SpinButton, {
-          class: 'btn-block btn-primary border font-weight-light',
-          title: 'Register device',
-          icon: 'fa-plus-circle',
-          onClick: function() {
-            var url = Settings.mdashURL +
-                '/customer?access_token=' + props.app.state.customer.token;
+          class : 'btn-block btn-primary border font-weight-light',
+          title : 'Register device',
+          icon : 'fa-plus-circle',
+          onClick : function() {
+            var url = App.settings.mdashURL + '/customer?access_token=' +
+                      props.app.state.customer.token;
             return axios.get(url)
                 .then(function(res) {
                   var data = res.data;
@@ -291,8 +293,8 @@ var PageAddDevice = function(props) {
                 .then(function(res) {
                   // props.app.setState({user: res.data});
                   console.log('success!!!');
-                  location.href = Settings.protocol + '//' + location.host +
-                      location.pathname;
+                  location.href = App.settings.protocol + '//' + location.host +
+                                  location.pathname;
                   // self.setState({step: 1});
                 })
                 .catch(function(err) {
@@ -318,7 +320,7 @@ var Content = function(props) {
       h(PageAddDevice, {app: props.app, path: 'add1'}));
 };
 
-var App = function(props) {
+App.Instance = function(props) {
   var self = this;
 
   self.componentDidMount = function() {
@@ -337,16 +339,16 @@ var App = function(props) {
       self.loadCustomer(access_token);
     } else {
       // Register new customer
-      axios.get(Settings.mdashURL + '/newcustomer')
+      axios.get(App.settings.mdashURL + '/newcustomer')
           .then(function(res) {
             return self.loadCustomer(res.data.token);
           })
-          .catch(errorHandler);
+          .catch(App.errorHandler);
     }
   };
 
   self.loadCustomer = function(access_token) {
-    var url = Settings.mdashURL + '/customer?access_token=' + access_token;
+    var url = App.settings.mdashURL + '/customer?access_token=' + access_token;
     return axios.get(url)
         .then(function(res) {
           self.setState({customer: res.data});
@@ -355,9 +357,9 @@ var App = function(props) {
             location.href = location.protocol + '//' + location.host +
                 location.pathname + location.hash;
         })
-        .catch(errorHandler);
+        .catch(function() {});
+    //.catch(App.errorHandler);
   };
-
 
   self.render = function(props, state) {
     var p = {app: self};
@@ -369,13 +371,13 @@ var App = function(props) {
               'display:grid;grid-template-rows: auto 1fr auto;' +
               'grid-template-columns: 100%;',
         },
-        h(Header, p), h(Content, p), h(Footer, p));
+        h(App.Header, p), h(Content, p), h(App.Footer, p));
   };
 };
 
 window.onload = function() {
   if (!window.localStorage) alert('Unsupported platform!');
-  preact.render(h(App), document.body);
+  preact.render(h(App.Instance), document.body);
 
   if ('serviceWorker' in navigator)  // for PWA
     navigator.serviceWorker.register('js/service-worker.js')
