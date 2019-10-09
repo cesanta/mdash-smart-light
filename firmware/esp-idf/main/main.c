@@ -82,7 +82,7 @@ static void onShadowDelta(struct jsonrpc_request *r) {
 }
 
 // When we're reconnected, report our current state to shadow
-static void onConnStateChange(void *event_data, void *user_data) {
+static void onConnnected(void *event_data, void *user_data) {
   struct device_state *state = (struct device_state *) user_data;
   (void) event_data;
   reportShadowState(state);
