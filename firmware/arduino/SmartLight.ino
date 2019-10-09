@@ -11,8 +11,8 @@ struct device_state {
   char *name; // Device name. If null, a default name is used
 };
 
-#define RESET_PIN 0
-#define LED_PIN 5
+#define RESET_PIN -1  // Set to your reset button pin
+#define LED_PIN 5     // Set to your LED pin
 
 static void reportShadowState(struct device_state *state) {
   mDashShadowUpdate("{\"state\":{\"reported\":{\"on\":%B,\"name\":%Q}}}",
@@ -21,13 +21,15 @@ static void reportShadowState(struct device_state *state) {
 
 // "Shadow.Delta" RPC handler
 // Called by the mDash when it generates shadow delta
-static void onShadowDelta(void *ctx, void *userdata) {
-  struct device_state *state = (struct device_state *) userdata;
-  const char *params = mDashGetParams(ctx);
+static void onShadowDelta(struct jsonrpc_request *r) {
+  struct device_state *state = (struct device_state *) r->userdata;
   char buf[50];
   int iv;
-  if (mDashGetBool(params, "$.state.on", &iv)) state->on = iv;
-  if (mDashGetStr(params, "$.state.app.name", buf, sizeof(buf)) > 0) {
+  if (mjson_get_bool(r->params, r->params_len, "$.state.on", &iv)) {
+    state->on = iv;
+  }
+  if (mjson_get_string(r->params, r->params_len, "$.state.app.name", buf,
+                       sizeof(buf)) > 0) {
     free(state->name);
     state->name = strdup(buf);
   }
@@ -36,15 +38,15 @@ static void onShadowDelta(void *ctx, void *userdata) {
 }
 
 // When we're reconnected, report our current state to shadow
-static void onConnStateChange(void *event_data, void *user_data) {
+static void onConnected(void *event_data, void *user_data) {
   struct device_state *state = (struct device_state *) user_data;
-  long connection_state = (long) event_data;
-  if (connection_state == MDASH_CONNECTED) reportShadowState(state);
+  reportShadowState(state);
 }
 
 // Wifi setup function. Called by the mDash library
 static void init_wifi(const char *wifi_network_name, const char *wifi_pass) {
   if (wifi_network_name == NULL) {
+    WiFi.softAP(MDASH_APP_NAME, "");
     MLOG(LL_INFO, "%s", "Starting access point ...");
   } else {
     MLOG(LL_INFO, "Joining WiFi network %s", wifi_network_name);
@@ -59,8 +61,8 @@ void setup() {
 
   // Start mDash library. Pass NULLs to read credentials from the config file
   mDashBeginWithWifi(init_wifi, NULL, NULL, NULL);
-  mDashExport("Shadow.Delta", onShadowDelta, &state);
-  mDashRegisterEventHandler(MDASH_EVENT_CONN_STATE, onConnStateChange, &state);
+  jsonrpc_export("Shadow.Delta", onShadowDelta, &state);
+  mDashRegisterEventHandler(MDASH_EVENT_CLOUD_CONNECTED, onConnected, &state);
 
   // Configure pins
   pinMode(LED_PIN, OUTPUT);
@@ -70,7 +72,7 @@ void setup() {
 void loop() {
   // If the reset button was pressed for > 3 seconds, reset device
   static unsigned long t;
-  if (t > 0 && millis() - t > 3000) mDashConfigReset();
+  if (RESET_PIN >= 0 && t > 0 && millis() - t > 3000) mDashConfigReset();
   t = digitalRead(RESET_PIN) == HIGH ? 0 : t == 0 ? millis() : t;
   // MLOG(LL_INFO, "%lu %d", t, digitalRead(RESET_PIN));
 

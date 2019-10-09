@@ -4,7 +4,7 @@ var App = {};
 App.settings = {
   provisionURL: 'http://192.168.4.1',
   mdashURL: 'https://mdash.net',
-  appKey: '',               // mDash -> Keys -> Add new
+  appID: '',
   callTimeoutMilli: 10000,  // 10 seconds
 };
 
@@ -21,8 +21,8 @@ App.Header = function(props) {
 App.Footer = function(props) {
   var self = this, app = props.app;
 
-  self.mkTabButton = function(title, icon, tab, href) {
-    var active = (location.href == href);
+  var mkTabButton = function(title, icon, tab, href) {
+    var active = (location.hash == href.replace(/.*#/, '#'));
     return h(
         'a', {
           href: href,
@@ -36,28 +36,161 @@ App.Footer = function(props) {
           h('div', {class: 'small'}, title)));
   };
 
-  self.render = function(props, state) {
-    var baseurl = location.host + location.pathname;
-    return h(
-        'footer', {
-          class: 'd-flex align-items-stretch border-top',
-          style: 'flex-shrink: 0;'
-        },
-        self.mkTabButton(
-            'My Devices', 'fa-server', PageDevices,
-            App.settings.protocol + '//' + baseurl + '#/'),
-        self.mkTabButton(
-            'Add Device', 'fa-plus-circle', PageAddDevice,
-            'http://' + baseurl + '?' + app.state.customer.token + '#/add1'));
-  };
+  var proto = App.settings.mdashURL.split(':')[0];
+  var base = proto + '://' + location.host + location.pathname;
+  var ibase = base.replace(/^https/, 'http');
+  return h(
+      'footer', {
+        class: 'd-flex align-items-stretch border-top',
+        style: 'flex-shrink: 0;'
+      },
+      mkTabButton('My Devices', 'fa-server', App.PageDevices, base + '#/'),
+      mkTabButton(
+          'Add Device', 'fa-plus-circle', App.PageAddDevice,
+          ibase + '?' + app.state.u.token + '#/new'));
 };
 
 App.errorHandler = function(e) {
-  var msg = (((e.response || {}).data || {}).e || {}).message || e.message || e;
-  alert(msg);
+  var o = ((e.response || {}).data || {}).error || {};
+  alert(o.message || e.message || e);
 };
 
-var SpinButton = function(props) {
+App.setKey = function(obj, key, val) {
+  var parts = key.split('.');
+  for (var i = 0; i < parts.length; i++) {
+    if (i >= parts.length - 1) {
+      obj[parts[i]] = val;
+    } else {
+      if (!obj[parts[i]]) obj[parts[i]] = {};
+      obj = obj[parts[i]];
+    }
+  }
+};
+
+App.getKey = function(obj, key) {
+  var parts = key.split('.');
+  for (var i = 0; i < parts.length; i++) {
+    if (typeof (obj) != 'object') return undefined;
+    if (!(parts[i] in obj)) return undefined;
+    obj = obj[parts[i]];
+  }
+  return obj;
+};
+
+App.Toggler = function(props) {
+  var self = this, state = self.state;
+  self.componentDidMount = function() {
+    state.expanded = props.expanded || false;
+  };
+  var div = state.expanded ?
+      props.children :
+      props.dnone ? h('div', {class: 'd-none'}, props.children) : null;
+  return h(
+      'span', {class: props.class || '', style: 'z-index: 999;'},
+      h('a', {
+        onClick: function(ev) {
+          ev.preventDefault();
+          self.setState({expanded: !state.expanded});
+        },
+        href: '#'
+      },
+        props.text || '', h('i', {
+          class:
+              'ml-2 fa ' + (state.expanded ? 'fa-caret-down' : 'fa-caret-right')
+        })),
+      props.extra, div);
+};
+
+App.Login = function(props) {
+  var self = this;
+  self.componentDidMount = function() {
+    self.setState({email: '', pass: ''});
+  };
+
+  self.render = function(props, state) {
+    return h(
+        'div', {
+          class: 'mx-auto bg-light rounded border my-5',
+          style: 'max-width: 480px;'
+        },
+        h('h3', {class: 'text-center py-3 text-muted'}, 'Smart Light login'),
+        h('div', {class: 'form p-3 rounded w-100'}, h('input', {
+            type: 'email',
+            placeholder: 'Email',
+            class: 'my-2 form-control',
+            onInput: function(ev) {
+              self.setState({email: ev.target.value});
+            }
+          }),
+          h('input', {
+            type: 'password',
+            placeholder: 'Password',
+            class: 'my-2 form-control',
+            onInput: function(ev) {
+              self.setState({pass: ev.target.value});
+            }
+          }),
+          h(App.SpinButton, {
+            class: 'btn-block btn-secondary',
+            disabled: !state.email || !state.pass,
+            title: 'Sign In',
+            icon: 'fa-sign-in',
+            onClick: function() {
+              var h = {
+                Authorization: 'Basic ' + btoa(state.email + ':' + state.pass)
+              };
+              return axios
+                  .get(App.settings.mdashURL + '/customer', {headers: h})
+                  .then(function(res) {
+                    props.app.login(res.data);
+                    preactRouter.route('');
+                  })
+                  .catch(App.errorHandler);
+            }
+          }),
+          h('div', {class: 'mt-2'}, 'No account yet? ',
+            h(App.Toggler, {text: 'Register'},
+              h('div', {}, h('input', {
+                  type: 'email',
+                  placeholder: 'Email',
+                  class: 'my-2 form-control',
+                  onInput: function(ev) {
+                    self.setState({email: ev.target.value});
+                  },
+                }),
+                h(App.SpinButton, {
+                  class: 'btn-block btn-secondary',
+                  icon: 'fa-envelope',
+                  title: 'Send invitation',
+                  disabled: !state.email,
+                  onClick: function() {
+                    var app_id = location.pathname.split('/')[2] || 'setme';
+                    var args = {
+                      email: state.email,
+                      url: App.settings.mdashURL,
+                      from: 'SmartLight',
+                      redir: location.href,
+                      app_id: app_id,
+                      text: 'Thank you for registering with SmartLight.\n' +
+                          'Your login: EMAIL\n' +
+                          'Your password: PASS\n' +
+                          'Please activate your account by ' +
+                          'visiting the link below:\nREGLINK'
+                    };
+                    return axios.post(App.settings.mdashURL + '/invite', args)
+                        .then(function(res) {
+                          alert('Thank you! Check your inbox and login.');
+                          self.setState({email: ''});
+                          location.reload();
+                        })
+                        .catch(App.errorHandler);
+                  },
+                }))))));
+  };
+};
+
+
+App.SpinButton = function(props) {
   var self = this, state = self.state;
   self.componentDidMount = function() {
     self.setState({spin: false});
@@ -84,7 +217,7 @@ var SpinButton = function(props) {
       props.title || 'submit');
 };
 
-var Device = function(props) {
+App.DeviceWidget = function(props) {
   var self = this;
   var url = App.settings.mdashURL + '/api/v2/m/device?access_token=' + props.k;
 
@@ -119,14 +252,8 @@ var Device = function(props) {
     var online = reported.online || false;
     var cbid = 'toggle-' + d.id;
     var checked = ar.on || false;
-    return h(
-        'div', {class: 'py-2 border-bottom d-flex flex-row'},
-        h('div', {}, h('b', {class: 'small font-weight-bold'}, d.id),
-          h('div', {},
-            h('b',
-              {class: 'small ' + (online ? 'text-success' : 'text-danger')},
-              online ? 'online' : 'offline'))),
-        h('div', {class: 'flex-grow-1 d-flex justify-content-end'},
+    var toggle =
+        h('span', {class: 'text-nowrap d-flex justify-content-end'},
           h('small', {class: 'mr-2 my-auto text-muted'}, 'toggle light:'),
           h('span', {class: 'toggle my-auto'}, h('input', {
               type: 'checkbox',
@@ -139,32 +266,44 @@ var Device = function(props) {
                 axios.post(url, body).catch(App.errorHandler);
               },
             }),
-            h('label', {'for': cbid}, h('span')))));
+            h('label', {'for': cbid}, h('span'))));
+    return h(
+        'div', {class: 'py-2 border-bottom d-flex flex-row'},
+        h('div', {class: 'mr-5'},
+          h('b', {class: 'small font-weight-bold'}, d.id),
+          h('div', {class: ''},
+            h('b',
+              {class: 'small ' + (online ? 'text-success' : 'text-danger')},
+              online ? 'online' : 'offline'))),
+        toggle,
+        h('div', {class: 'flex-grow-1 d-flex justify-content-end mr-2 mt-1'},
+          h('a', {href: '/devices/' + encodeURIComponent(props.k)},
+            h('i', {class: 'fa fa-cog'}))));
   };
 };
 
-var PageDevices = function(props) {
+App.PageDevices = function(props) {
   var self = this;
   self.componentDidMount = function() {
     props.app.setState({title: 'My Devices'});
   };
   self.render = function(props, state) {
-    var keys = Object.keys((props.app.state.customer || {}).meta || {});
+    var pubkeys = Object.keys((props.app.state.u || {}).pubkeys || {});
     return h(
         'div', {class: 'overflow-auto p-2'},
-        keys.length == 0 ?
+        pubkeys.length == 0 ?
             h('div', {class: 'h-100 d-flex align-items-center'},
               h('div',
                 {class: 'text-center w-100 text-muted font-weight-light'},
                 h('i', {class: 'fa fa-bell-o fa-2x'}), h('br'),
                 'No devices yet')) :
-            h('div', {class: 'h-100'}, keys.map(function(k) {
-              return h(Device, {k: k, app: props.app});
+            h('div', {class: 'h-100'}, pubkeys.map(function(k) {
+              return h(App.DeviceWidget, {k: k, app: props.app});
             })));
   }
 };
 
-var PageAddDevice = function(props) {
+App.PageAddDevice = function(props) {
   var self = this;
 
   self.componentDidMount = function() {
@@ -182,7 +321,7 @@ var PageAddDevice = function(props) {
         h('div', {class: alertClass}, 'Go to your phone settings', h('br'),
           'Join WiFi network SmartLight-XXXX', h('br'),
           'Return to this screen and press the Scan button'),
-        h(SpinButton, {
+        h(App.SpinButton, {
           class: 'btn-block btn-primary border font-weight-light',
           title: 'Scan',
           icon: 'fa-search',
@@ -241,7 +380,7 @@ var PageAddDevice = function(props) {
           self.setState({pass: ev.target.value});
         },
       }),
-      h(SpinButton, {
+      h(App.SpinButton, {
         class: 'btn-block btn-primary font-weight-light',
         title: 'Configure device WiFi',
         icon: 'fa-save',
@@ -267,35 +406,35 @@ var PageAddDevice = function(props) {
   var Step2 =
       h('div', {},
         h('a', {
-          href : location.href,
-          class : 'link text-decoration-none',
-          onClick : function() { self.setState({step : 1}); }
+          href: location.href,
+          class: 'link text-decoration-none',
+          onClick: function() {
+            self.setState({step: 1});
+          }
         },
           '\u2190', ' back'),
-        h('div', {class : alertClass + ' mt-2'}, 'WiFi configuretion applied. ',
+        h('div', {class: alertClass + ' mt-2'}, 'WiFi configuretion applied. ',
           'Go to your phone settings,', h('br'),
           'Join back to your WiFi network,', h('br'),
           'Return to this screen and press on Register device.'),
-        h(SpinButton, {
-          class : 'btn-block btn-primary border font-weight-light',
-          title : 'Register device',
-          icon : 'fa-plus-circle',
-          onClick : function() {
-            var url = App.settings.mdashURL + '/customer?access_token=' +
-                      props.app.state.customer.token;
+        h(App.SpinButton, {
+          class: 'btn-block btn-primary border font-weight-light',
+          title: 'Register device',
+          icon: 'fa-plus-circle',
+          onClick: function() {
+            var url = App.settings.mdashURL +
+                '/customer?access_token=' + props.app.state.u.token;
             return axios.get(url)
                 .then(function(res) {
                   var data = res.data;
-                  if (!data.meta) data.meta = {};
-                  data.meta[self.state.public_key] = {};
+                  if (!data.pubkeys) data.pubkeys = {};
+                  data.pubkeys[self.state.public_key] = {};
                   return axios({method: 'POST', url: url, data: data});
                 })
                 .then(function(res) {
-                  // props.app.setState({user: res.data});
-                  console.log('success!!!');
-                  location.href = App.settings.protocol + '//' + location.host +
-                                  location.pathname;
-                  // self.setState({step: 1});
+                  var proto = App.settings.mdashURL.split(':')[0];
+                  location.href =
+                      proto + '://' + location.host + location.pathname;
                 })
                 .catch(function(err) {
                   alert(
@@ -308,7 +447,94 @@ var PageAddDevice = function(props) {
   return h('div', {class: 'overflow-auto p-2'}, steps[self.state.step]);
 };
 
-var Content = function(props) {
+App.PageDeviceSettings = function(props) {
+  var self = this;
+  var url = App.settings.mdashURL + '/api/v2/m/device?access_token=' + props.k;
+
+  self.componentDidMount = function() {
+    props.app.setState({title: 'Devices / '});
+    self.setState({device: null, c: {}});
+    self.refresh();
+  };
+
+  self.componentWillUnmount = function() {
+    self.unmounted = true;
+  };
+
+  self.refresh = function() {
+    return axios.get(url)
+        .then(function(res) {
+          self.setState({device: res.data});
+          props.app.setState({title: 'Devices / ' + res.data.id});
+        })
+        .catch(function(err) {
+          self.setState({device: {id: ''}});
+        });
+  };
+
+  var mkin = function(ph) {
+    return h(
+        'input', {type: 'text', placeholder: ph, class: 'my-2 form-control'});
+  };
+  var mkrow = function(label, k, dis, c, r) {
+    return h(
+        'div', {class: 'form-group row my-2'},
+        h('label', {class: 'col-form-label col-4'}, label),
+        h('div', {class: 'col-8'}, h('input', {
+            type: 'text',
+            // value: state.c[k] || r.config[k] || '',
+            value: App.getKey(c, k) || App.getKey(r, k) || '',
+            placeholder: label,
+            disabled: !!dis || !r.online,
+            class: 'form-control',
+            onInput: function(ev) {
+              App.setKey(c, k, ev.target.value);
+            },
+          })));
+  };
+
+  self.render = function(props, state) {
+    // if (!state.device) return 'loading ...';
+    var r = (((state.device || {}).shadow || {}).state || {}).reported || {};
+    return h(
+        'div', {class: 'px-2 form'}, h('div', {class: 'my-1'}, '\u00a0'),
+        mkrow('Name', 'name', false, state.c, r), h(App.SpinButton, {
+          class: 'btn-block btn-primary mt-3',
+          title: 'Save device settings',
+          icon: 'fa-save',
+          onClick: function() {
+            var url =
+                App.settings.mdashURL + '/m/device?access_token=' + props.k;
+            var data = {shadow: {desired: {name: state.c.name}}};
+            return axios({method: 'POST', url: url, data: data})
+                .then(self.refresh)
+                .catch(App.errorHandler);
+          }
+        }),
+        h('hr'),
+        h('div', {class: 'small text-muted mt-4'},
+          'NOTE: device deletion cannot be undone'),
+        h(App.SpinButton, {
+          class: 'btn-block btn-danger mt-3',
+          title: 'Delete device',
+          icon: 'fa-times',
+          onClick: function() {
+            var url = App.settings.mdashURL +
+                '/customer?access_token=' + props.app.state.u.token;
+            var keys = props.app.state.u.pubkeys || {};
+            delete keys[props.k];
+            return axios({method: 'POST', url: url, data: {pubkeys: keys}})
+                .then(function(res) {
+                  props.app.setState({u: res.data});
+                  preactRouter.route('');
+                })
+                .catch(App.errorHandler);
+          }
+        }));
+  };
+};
+
+App.Content = function(props) {
   return h(
       preactRouter.Router, {
         history: History.createHashHistory(),
@@ -316,53 +542,51 @@ var Content = function(props) {
           props.app.setState({url: ev.url});
         }
       },
-      h(PageDevices, {app: props.app, default: true}),
-      h(PageAddDevice, {app: props.app, path: 'add1'}));
+      h(App.PageDevices, {app: props.app, default: true}),
+      h(App.PageDeviceSettings, {app: props.app, path: '/devices/:k'}),
+      h(App.PageAddDevice, {app: props.app, path: 'new'}));
 };
 
 App.Instance = function(props) {
   var self = this;
+  App.self = self;
 
   self.componentDidMount = function() {
-    // This app uses non-authenticated anonymous customers
-    // App goes to mDash and says: register a new anonymous customer for me.
-    // mDash creates an anonymous customer and returns access token.
-    // An app stores this token for later, and associates all devices
-    // with that anonymous customer.
-    //
-    // This app does not provide a way to share this customer, so it is not
-    // possible to "login" from another phone or laptop and see same devices.
-    // For that, use authenticated customers.
     var access_token = location.search.substring(1) || localStorage.sltok;
     if (access_token === 'undefined') access_token = undefined;
     if (access_token) {
-      self.loadCustomer(access_token);
-    } else {
-      // Register new customer
-      axios.get(App.settings.mdashURL + '/newcustomer')
+      var url =
+          App.settings.mdashURL + '/customer?access_token=' + access_token;
+      self.setState({loading: true});
+      return axios.get(url)
           .then(function(res) {
-            return self.loadCustomer(res.data.token);
+            self.login(res.data);
           })
-          .catch(App.errorHandler);
+          .catch(function(e) {})
+          .then(function() {
+            self.setState({loading: false});
+          });
     }
   };
 
-  self.loadCustomer = function(access_token) {
-    var url = App.settings.mdashURL + '/customer?access_token=' + access_token;
-    return axios.get(url)
-        .then(function(res) {
-          self.setState({customer: res.data});
-          localStorage.sltok = res.data.token;
-          if (location.search.length > 0)
-            location.href = location.protocol + '//' + location.host +
-                location.pathname + location.hash;
-        })
-        .catch(function() {});
-    //.catch(App.errorHandler);
+  self.logout = function() {
+    delete localStorage.sltok;
+    self.setState({u: null});
+    return Promise.resolve();
+  };
+
+  self.login = function(u) {
+    self.setState({u: u});
+    localStorage.sltok = u.token;
+    if (location.search.length > 0)
+      location.href = location.protocol + '//' + location.host +
+          location.pathname + location.hash;
   };
 
   self.render = function(props, state) {
     var p = {app: self};
+    if (self.state.loading) return h('div');    // Show blank page when loading
+    if (!self.state.u) return h(App.Login, p);  // Show login unless logged
     return h(
         'div', {
           class: 'main border',
@@ -371,8 +595,10 @@ App.Instance = function(props) {
               'display:grid;grid-template-rows: auto 1fr auto;' +
               'grid-template-columns: 100%;',
         },
-        h(App.Header, p), h(Content, p), h(App.Footer, p));
+        h(App.Header, p), h(App.Content, p), h(App.Footer, p));
   };
+
+  return self.render(props, self.state);
 };
 
 window.onload = function() {

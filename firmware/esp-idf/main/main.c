@@ -24,7 +24,7 @@
 #define MDASH_APP_NAME "mdash-smart-light"
 #include "../mDash/src/mDash.h"
 
-#define RESET_PIN 0
+#define RESET_PIN -1
 #define LED_PIN 5
 
 struct device_state {
@@ -65,13 +65,15 @@ static void reportShadowState(struct device_state *state) {
 
 // "Shadow.Delta" RPC handler
 // Called by the mDash when it generates shadow delta
-static void onShadowDelta(void *ctx, void *userdata) {
-  struct device_state *state = (struct device_state *) userdata;
-  const char *params = mDashGetParams(ctx);
+static void onShadowDelta(struct jsonrpc_request *r) {
+  struct device_state *state = (struct device_state *) r->userdata;
   char buf[50];
   int iv;
-  if (mDashGetBool(params, "$.state.on", &iv)) state->on = iv;
-  if (mDashGetStr(params, "$.state.app.name", buf, sizeof(buf)) > 0) {
+  if (mjson_get_bool(r->params, r->params_len, "$.state.on", &iv)) {
+    state->on = iv;
+  }
+  if (mjson_get_string(r->params, r->params_len, "$.state.app.name", buf,
+                       sizeof(buf)) > 0) {
     free(state->name);
     state->name = strdup(buf);
   }
@@ -82,8 +84,8 @@ static void onShadowDelta(void *ctx, void *userdata) {
 // When we're reconnected, report our current state to shadow
 static void onConnStateChange(void *event_data, void *user_data) {
   struct device_state *state = (struct device_state *) user_data;
-  long connection_state = (long) event_data;
-  if (connection_state == MDASH_CONNECTED) reportShadowState(state);
+  (void) event_data;
+  reportShadowState(state);
 }
 
 static void setup(void) {
@@ -104,7 +106,7 @@ static void reset_on_long_press(int reset_pin, int duration_ms) {
 }
 
 static void loop(void) {
-  reset_on_long_press(RESET_PIN, 3000);  // Reset device on button press
+  if (RESET_PIN >= 0) reset_on_long_press(RESET_PIN, 3000);
   mDashCLI(getchar());                   // Handle CLI input
   vTaskDelay(10 / portTICK_PERIOD_MS);   // Sleep 10ms
 }
@@ -118,8 +120,8 @@ static void pause_then_reboot(int sleep_seconds) {
 void app_main() {
   struct device_state state = {.on = false, .name = NULL};
   mDashBeginWithWifi(init_wifi, NULL, NULL, NULL);
-  mDashExport("Shadow.Delta", onShadowDelta, &state);
-  mDashRegisterEventHandler(MDASH_EVENT_CONN_STATE, onConnStateChange, &state);
+  jsonrpc_export("Shadow.Delta", onShadowDelta, &state);
+  mDashRegisterEventHandler(MDASH_EVENT_CLOUD_CONNECTED, onConnnected, &state);
 
   // If a device recovered after a crash, do not start firmware logic
   // because it could crash again, thus fall into a crash-loop and make
