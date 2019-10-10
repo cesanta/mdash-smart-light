@@ -2,9 +2,11 @@ var h = preact.h;
 var App = {};
 
 App.settings = {
+  // Go to WebApp page, copy the App ID and page below
+  // https://mdash.net/a/YOUR_APP_ID/
+  appID: '',  // <-- Set this to YOUR_APP_ID
   provisionURL: 'http://192.168.4.1',
   mdashURL: 'https://mdash.net',
-  appID: '',
   callTimeoutMilli: 10000,  // 10 seconds
 };
 
@@ -164,7 +166,8 @@ App.Login = function(props) {
                   title: 'Send invitation',
                   disabled: !state.email,
                   onClick: function() {
-                    var app_id = location.pathname.split('/')[2] || 'setme';
+                    var app_id = App.settings.appID ||
+                        location.pathname.split('/')[2] || 'setme';
                     var args = {
                       email: state.email,
                       url: App.settings.mdashURL,
