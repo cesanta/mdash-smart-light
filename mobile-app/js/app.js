@@ -177,8 +177,8 @@ App.Login = function(props) {
                       text: 'Thank you for registering with SmartLight.\n' +
                           'Your login: EMAIL\n' +
                           'Your password: PASS\n' +
-                          'Please activate your account by ' +
-                          'visiting the link below:\nREGLINK'
+                          'Click on the link below to activate your account ' +
+                          'and login:\nREGLINK'
                     };
                     return axios.post(App.settings.mdashURL + '/invite', args)
                         .then(function(res) {
